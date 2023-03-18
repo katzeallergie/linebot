@@ -5,6 +5,7 @@ const express = require("express");
 const line = require("@line/bot-sdk");
 const res = require("express/lib/response");
 const PORT = process.env.PORT || 3000;
+const request = require("request");
 
 const config = {
   channelSecret: "2c05ab391c5128945522d9605944d99f",
@@ -18,8 +19,10 @@ const app = express();
 
 app.get("/", (req, res) => res.send("Hello LINE BOT!(GET)")); //ブラウザ確認用(無くても問題ない)
 app.get("/apex", (req, res) => {
-  const kome = getProfile("origin", "BIG_KOME_SYAR");
-  res.send(kome);
+  (async () => {
+    const data = await getProfile("origin", "BIG_KOME_SYAR");
+    res.send("rank: " + data.metadata.rankName + ", point: " + data.value);
+  })();
 });
 app.post("/webhook", line.middleware(config), (req, res) => {
   console.log(req.body.events);
@@ -57,11 +60,41 @@ async function handleEvent(event) {
       type: "text",
       text: getRestRankDay(), //実際に返信の言葉を入れる箇所
     });
-  } else if (message === "ランク") {
-    const profile = await getProfile("origin", "BIG_KOME_SYAR");
+  } else if (message === "こめのランク教えて") {
+    const rank = await getProfile("origin", "BIG_KOME_SYAR");
+
     return client.replyMessage(event.replyToken, {
       type: "text",
-      text: profile,
+      text:
+        "こめの現在のランクは『" +
+        rank.metadata.rankName +
+        " (" +
+        rank.value +
+        "RP)』です。",
+    });
+  } else if (message === "こうたのランク教えて") {
+    const rank = await getProfile("origin", "skx4koukyou");
+
+    return client.replyMessage(event.replyToken, {
+      type: "text",
+      text:
+        "こうたの現在のランクは『" +
+        rank.metadata.rankName +
+        " (" +
+        rank.value +
+        "RP)』です。",
+    });
+  } else if (message === "たつひこのランク教えて") {
+    const rank = await getProfile("psn", "glucose121");
+
+    return client.replyMessage(event.replyToken, {
+      type: "text",
+      text:
+        "たつひこの現在のランクは『" +
+        rank.metadata.rankName +
+        " (" +
+        rank.value +
+        "RP)』です。",
     });
   }
 
@@ -92,13 +125,26 @@ function getRestRankDay() {
 //const APEX_REQUEST = "https://public-api.tracker.gg/v2/apex/standard/profile/{platform}/{platformUserIdentifier}"
 const API_KEY = "41431d85-7e52-4250-9747-631de1368506";
 
-async function getProfile(platform, playerId) {
+function getProfile(platform, playerId) {
   // const result = await fetch(
   //   `https://public-api.tracker.gg/v2/apex/standard/profile/${platform}/${playerId}`,
   //   { headers: { "TRN-Api-Key": API_KEY } }
   // ).then((res) => res.json);
   // console.log(result);
   // return result;
+
+  return new Promise((resolve, reject) => {
+    request.get(
+      {
+        uri: `https://public-api.tracker.gg/v2/apex/standard/profile/${platform}/${playerId}`,
+        headers: { "TRN-Api-Key": API_KEY },
+        json: true,
+      },
+      (err, req, res) => {
+        resolve(res.data.segments[0].stats.rankScore);
+      }
+    );
+  });
 }
 
 process.env.NOW_REGION ? (module.exports = app) : app.listen(PORT);
