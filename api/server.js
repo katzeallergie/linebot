@@ -20,8 +20,16 @@ const app = express();
 app.get("/", (req, res) => res.send("Hello LINE BOT!(GET)")); //ブラウザ確認用(無くても問題ない)
 app.get("/apex", (req, res) => {
   (async () => {
-    const data = await getProfile("origin", "BIG_KOME_SYAR");
-    res.send("rank: " + data.metadata.rankName + ", point: " + data.value);
+    const data_origin = await getProfile("origin", "glucose121");
+    const data_ps4 = await getProfile("psn", "glucose121");
+    let rank;
+    if (typeof data_origin.errors === "undefined") {
+      rank = data_origin.data.segments[0].stats.rankScore;
+    } else {
+      console.log(data_ps4);
+      rank = data_ps4.data.segments[0].stats.rankScore;
+    }
+    res.send("rank: " + rank.metadata.rankName + ", point: " + rank.value);
   })();
 });
 app.post("/webhook", line.middleware(config), (req, res) => {
@@ -50,6 +58,7 @@ async function handleEvent(event) {
   }
 
   const message = event.message.text;
+  const re = /のランク教えて$/;
   if (message === "ランクのマップ教えて") {
     return client.replyMessage(event.replyToken, {
       type: "text",
@@ -61,7 +70,8 @@ async function handleEvent(event) {
       text: getRestRankDay(), //実際に返信の言葉を入れる箇所
     });
   } else if (message === "こめのランク教えて") {
-    const rank = await getProfile("origin", "BIG_KOME_SYAR");
+    const data = await getProfile("origin", "ramen2100");
+    const rank = data.data.segments[0].stats.rankScore;
 
     return client.replyMessage(event.replyToken, {
       type: "text",
@@ -73,7 +83,8 @@ async function handleEvent(event) {
         "RP)』です。",
     });
   } else if (message === "こうたのランク教えて") {
-    const rank = await getProfile("origin", "skx4koukyou");
+    const data = await getProfile("origin", "skx4koukyou");
+    const rank = data.data.segments[0].stats.rankScore;
 
     return client.replyMessage(event.replyToken, {
       type: "text",
@@ -85,12 +96,34 @@ async function handleEvent(event) {
         "RP)』です。",
     });
   } else if (message === "たつひこのランク教えて") {
-    const rank = await getProfile("psn", "glucose121");
+    const data = await getProfile("psn", "glucose121");
+    const rank = data.data.segments[0].stats.rankScore;
 
     return client.replyMessage(event.replyToken, {
       type: "text",
       text:
         "たつひこの現在のランクは『" +
+        rank.metadata.rankName +
+        " (" +
+        rank.value +
+        "RP)』です。",
+    });
+  } else if (re.test(message)) {
+    const id = message.split("のランク教えて")[0];
+    const data_origin = await getProfile("origin", id);
+    const data_ps4 = await getProfile("psn", id);
+    let rank;
+    if (typeof data_origin.errors === "undefined") {
+      rank = data_origin.data.segments[0].stats.rankScore;
+    } else {
+      rank = data_ps4.data.segments[0].stats.rankScore;
+    }
+
+    return client.replyMessage(event.replyToken, {
+      type: "text",
+      text:
+        id +
+        "の現在のランクは『" +
         rank.metadata.rankName +
         " (" +
         rank.value +
@@ -109,13 +142,13 @@ function getRankMap() {
   const now = new Date();
   const diff = now - startDate;
   const diffDay = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const mapNames = ["ワールズエッジ", "ストームポイント", "ブロークンムーン"];
+  const mapNames = ["オリンパス", "ストームポイント", "ブロークンムーン"];
   const currentMapName = mapNames[diffDay % 3];
   return "現在のマップは『" + currentMapName + "』です";
 }
 
 function getRestRankDay() {
-  const endDate = new Date(2023, 3, 5, 3);
+  const endDate = new Date(2023, 4, 10, 3);
   const now = new Date();
   const diff = endDate - now;
   const diffDay = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -141,7 +174,8 @@ function getProfile(platform, playerId) {
         json: true,
       },
       (err, req, res) => {
-        resolve(res.data.segments[0].stats.rankScore);
+        //resolve(res.data.segments[0].stats.rankScore);
+        resolve(res);
       }
     );
   });
