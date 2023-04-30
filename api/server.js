@@ -138,17 +138,17 @@ async function handleEvent(event) {
 }
 
 function getRankMap() {
-  const startDate = new Date(2023, 1, 15, 3);
+  const startDate = new Date(2023, 1, 15, 2); // TODO: ランクリセットされたら開始日を変更
   const now = new Date();
   const diff = now - startDate;
   const diffDay = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const mapNames = ["オリンパス", "ストームポイント", "ブロークンムーン"];
+  const mapNames = ["オリンパス", "ストームポイント", "ブロークンムーン"]; // TODO: ランクリセットされたらマップローテを変更
   const currentMapName = mapNames[diffDay % 3];
   return "現在のマップは『" + currentMapName + "』です";
 }
 
 function getRestRankDay() {
-  const endDate = new Date(2023, 4, 10, 3);
+  const endDate = new Date(2023, 4, 10, 3); // TODO: ランクリセットされたら終了日を変更
   const now = new Date();
   const diff = endDate - now;
   const diffDay = Math.floor(diff / (1000 * 60 * 60 * 24));
