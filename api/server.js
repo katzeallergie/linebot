@@ -8,9 +8,8 @@ const PORT = process.env.PORT || 3000;
 const request = require("request");
 
 const config = {
-  channelSecret: "2c05ab391c5128945522d9605944d99f",
-  channelAccessToken:
-    "i+DP6AiUz3yPt6LEM1lXC2vRVURiGatGwI35Ocx+0yhDQWIrNVTsO7ZpUjoD/04zY+D9jg81W5j+zvUFQi/Kb6KDE+9qUF0GijRUktRM9LSGMl339ctTwbWsrVtaA2n+FHpixdPMNq6vF0Ppa5EZcQdB04t89/1O/w1cDnyilFU=",
+  channelSecret: process.env.channelSecret,
+  channelAccessToken:process.env.channelAccessToken,
 };
 
 getRankMap();
@@ -80,7 +79,7 @@ async function handleEvent(event) {
         rank.metadata.rankName +
         " (" +
         rank.value +
-        "RP)』です。",
+        "LP)』です。",
     });
   } else if (message === "こうたのランク教えて") {
     const data = await getProfile("origin", "skx4koukyou");
@@ -93,7 +92,7 @@ async function handleEvent(event) {
         rank.metadata.rankName +
         " (" +
         rank.value +
-        "RP)』です。",
+        "LP)』です。",
     });
   } else if (message === "たつひこのランク教えて") {
     const data = await getProfile("psn", "glucose121");
@@ -106,7 +105,7 @@ async function handleEvent(event) {
         rank.metadata.rankName +
         " (" +
         rank.value +
-        "RP)』です。",
+        "LP)』です。",
     });
   } else if (re.test(message)) {
     const id = message.split("のランク教えて")[0];
@@ -127,7 +126,19 @@ async function handleEvent(event) {
         rank.metadata.rankName +
         " (" +
         rank.value +
-        "RP)』です。",
+        "LP)』です。",
+    });
+  } else if (message === "使い方教えて") {
+    return client.replyMessage(event.replyToken, {
+      type: "text",
+      text:
+        "現在は3つの言葉に反応してくれます。\n\n" +
+        "1. ユーザーのランクを知りたい時\n" +
+        "『{user_name}のランクを教えて』\n" +
+        "2. 現在のランクのマップを知りたい時\n" +
+        "『ランクのマップ教えて』\n" +
+        "3. ランクの残り日数を知りたい時\n" +
+        "『ランクあと何日』",
     });
   }
 
@@ -138,18 +149,22 @@ async function handleEvent(event) {
 }
 
 function getRankMap() {
-  const startDate = new Date(2023, 1, 15, 2); // TODO: ランクリセットされたら開始日を変更
-  const now = new Date();
+  const startDate = new Date(2023, 4, 10, 2); // TODO: ランクリセットされたら開始日を変更
+  const now = new Date(
+    Date.now() + (new Date().getTimezoneOffset() + 9 * 60) * 60 * 1000
+  );
   const diff = now - startDate;
   const diffDay = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const mapNames = ["オリンパス", "ストームポイント", "ブロークンムーン"]; // TODO: ランクリセットされたらマップローテを変更
+  const mapNames = ["オリンパス", "キングスキャニオン", "ワールズエッジ"]; // TODO: ランクリセットされたらマップローテを変更
   const currentMapName = mapNames[diffDay % 3];
   return "現在のマップは『" + currentMapName + "』です";
 }
 
 function getRestRankDay() {
-  const endDate = new Date(2023, 4, 10, 3); // TODO: ランクリセットされたら終了日を変更
-  const now = new Date();
+  const endDate = new Date(2023, 7, 9, 2); // TODO: ランクリセットされたら終了日を変更
+  const now = new Date(
+    Date.now() + (new Date().getTimezoneOffset() + 9 * 60) * 60 * 1000
+  );
   const diff = endDate - now;
   const diffDay = Math.floor(diff / (1000 * 60 * 60 * 24));
   return "今スプリットは残り" + diffDay + "日です";
