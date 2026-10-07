@@ -1,0 +1,13 @@
+[
+  {
+    "id": "sansan-ikebukuro",
+    "name": "Sansanピックルボールコート池袋",
+    "site_url": "https://sansan-pickleball.com/",
+    "booking_url": "https://reserve.sansan-pickleball.com/booking",
+    "terms_url": "https://sansan-pickleball.com/terms/",
+    "court_types": ["indoor"],
+    "price_hint": null,
+    "enabled": true,
+    "min_interval_ms": 3000
+  }
+]
