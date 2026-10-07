@@ -13,9 +13,19 @@ node bin/cli.js [--facility ID ...] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--for
 `{ facility, court_type(indoor|outdoor|unknown), date, start, end, status(available|booked|unknown), price, booking_url, fetched_at, note? }`
 時刻 `HH:MM`・日付 `YYYY-MM-DD`(JST)、`price` は円または null。
 
+## 条件検索 (`bin/query.js`)
+「来週土曜16:00から2時間空いてる安いコートは?」のような質問向け。日本語→条件の変換は Claude が行い、ツールは決まった処理だけを行う。
+```
+node bin/query.js --date 2026-10-17 --start 16:00 --duration 2 [--region tokyo] [--court-type indoor|outdoor] [--max-price 合計円] [--sort price|name] [--format table|json]
+```
+- 同じコートが `start` から `duration` 時間ぶん連続で空いているものを、合計料金の安い順に返す。
+- 方式: 開始時刻を選び「＋」で利用時間を延ばし、コート別の空き・単価を読む(予約には進まない)。1回の検索で施設ごとに数件のGETが発生する。
+- 失敗した施設は `errors`、検索未対応(adapter に `findCourts` が無い)施設は `skipped` に出し、推測しない。
+- 施設の絞り込みは `config/facilities.json` の `region`(例: tokyo)で行う。
+
 ## 新施設の足し方
 1. `config/facilities.json` に施設を追加(id, name, URL, court_types, price_hint, min_interval_ms)。
-2. `src/adapters/<id>.js` を作り、`export const id` と `export async function fetchAvailability({facility, from, to, now, sleep})` を実装。`makeSlot()` の配列を返す。
+2. `src/adapters/<id>.js` を作り、`export const id` と `export async function fetchAvailability({facility, from, to, now, sleep})` を実装。`makeSlot()` の配列を返す。条件検索に対応するなら `findCourts({facility, date, start, duration})` も実装し、`[{court, floor, court_type, price_per_hour, total_price}]` を返す(`src/courts.js` は Sansan 用の画面テキスト解析)。
 3. 以上。レジストリは `adapters/` を自動走査する。例外を投げても runner が `unknown` として記録し、他施設は継続する。
 - 取得方式は **API(JSON)優先、無ければ Playwright**(optionalDependency)。規約を先に確認すること。
 
@@ -30,7 +40,7 @@ node bin/cli.js [--facility ID ...] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--for
 
 ## うまくいかなかった点・既知の制限
 - **court_type は unknown、price は null**。時間枠を選ぶと待ち行列・料金のGETが数件ずつ増えるため選ばない。空きコート数は `note`(例: 空きコート2面)に入る。
-- **取得するのは毎時00分開始の枠のみ**。サイトのカレンダー表示(空N枠)と突き合わせると、2026-10-07〜17の11日中7日は一致したが、4日(10/10, 10/11, 10/15, 10/17)で当ツールの合計のほうが少なかった。予約に :30 開始(例: 13:30)があるため、:30 開始の空きを拾えていない可能性がある(未検証)。**「空きなし」と出ても :30 開始の空きがあり得る**。
+- サイトの開始時間は毎時00分のみ、利用時間は1時間単位(最大3〜4時間)。時間リストと日別カレンダーの「空N枠」は一部の日で合計が一致しなかった(11日中4日)。10/10 で時間リスト・コート別表示とも当ツールの出力と一致したため、カレンダー側の数え方が違うと見ている(原因は未確認)。当ツールは時間リストとコート別表示を正とする。
 - 開始時刻を過ぎた枠は `unknown`(note: 終了)。
 
 ## 保守で壊れやすい点

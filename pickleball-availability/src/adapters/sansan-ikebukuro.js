@@ -1,4 +1,5 @@
 import { makeSlot, makeUnknown, dateRange } from '../schema.js';
+import { parseCourtList } from '../courts.js';
 
 /**
  * Sansanピックルボールコート池袋 アダプタ (画面読み取り / Playwright)。
@@ -58,12 +59,27 @@ async function gotoMonth(page, ym) {
   return false;
 }
 
+async function loadPlaywright() {
+  try { return (await import('playwright')).chromium; }
+  catch { throw new Error('playwright not installed (npm i playwright)'); }
+}
+
+/** カレンダーの日付をクリックする。選べなければ理由の文字列、選べれば null を返す。 */
+async function selectDay(page, date) {
+  if (!(await gotoMonth(page, date.slice(0, 7)))) return 'month not reachable in calendar';
+  const day = Number(date.slice(8));
+  const cell = page.locator(DAY).filter({ has: page.locator('[class*="calendarDayNum"]', { hasText: new RegExp(`^${day}$`) }) });
+  if ((await cell.count()) !== 1) return 'day cell not found';
+  if (await cell.isDisabled()) return '選択不可(過去日または受付範囲外)';
+  await cell.click();
+  await page.waitForTimeout(800);
+  await assertNoBlocker(page);
+  return null;
+}
+
 /** @param {{facility:object, from:string, to:string, now:string, sleep:(ms:number)=>Promise<void>}} ctx */
 export async function fetchAvailability({ facility, from, to, now, sleep }) {
-  let chromium;
-  try { ({ chromium } = await import('playwright')); }
-  catch { throw new Error('playwright not installed (npm i playwright)'); }
-
+  const chromium = await loadPlaywright();
   const common = { facility: id, booking_url: facility.booking_url, fetched_at: now };
   const unknown = (date, note) => makeUnknown({ ...common, date, note });
   const browser = await chromium.launch({ executablePath: process.env.PB_CHROMIUM_PATH || undefined });
@@ -73,21 +89,9 @@ export async function fetchAvailability({ facility, from, to, now, sleep }) {
     await assertNoBlocker(page);
 
     const out = [];
-    let loadedMonth = null;
     for (const date of dateRange(from, to)) {
-      const ym = date.slice(0, 7);
-      if (ym !== loadedMonth) {
-        if (!(await gotoMonth(page, ym))) { out.push(unknown(date, 'month not reachable in calendar')); continue; }
-        loadedMonth = ym;
-      }
-      const day = Number(date.slice(8));
-      const cell = page.locator(DAY).filter({ has: page.locator('[class*="calendarDayNum"]', { hasText: new RegExp(`^${day}$`) }) });
-      if ((await cell.count()) !== 1) { out.push(unknown(date, 'day cell not found')); continue; }
-      if (await cell.isDisabled()) { out.push(unknown(date, '選択不可(過去日または受付範囲外)')); continue; }
-
-      await cell.click();
-      await page.waitForTimeout(800);
-      await assertNoBlocker(page);
+      const why = await selectDay(page, date);
+      if (why) { out.push(unknown(date, why)); continue; }
       const buttons = await page.locator(HOUR).evaluateAll((els) =>
         els.map((e) => ({ text: e.innerText, available: /hourBtnAvailable/.test(e.className) })));
       const slots = parseHourButtons(buttons, { ...common, date });
@@ -95,6 +99,43 @@ export async function fetchAvailability({ facility, from, to, now, sleep }) {
       await sleep(facility.min_interval_ms ?? 3000);
     }
     return out;
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * 条件に合う空きコートを返す: date の start から duration 時間ぶん連続で空いているコート。
+ * 開始時刻を選び「＋」で利用時間を延ばし、コート別の表示(空きなし/単価)を読む。
+ * 選択は画面上の操作のみで、予約・決済には進まない。
+ * @returns {Promise<{court:string, floor:string, court_type:string, price_per_hour:number, total_price:number}[]>}
+ */
+export async function findCourts({ facility, date, start, duration }) {
+  const chromium = await loadPlaywright();
+  const browser = await chromium.launch({ executablePath: process.env.PB_CHROMIUM_PATH || undefined });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1100, height: 2400 } });
+    await page.goto(facility.booking_url, { waitUntil: 'networkidle', timeout: 30000 });
+    await assertNoBlocker(page);
+    const why = await selectDay(page, date);
+    if (why) throw new Error(why);
+
+    const hour = page.locator(HOUR).filter({ hasText: new RegExp(`^${start}`) });
+    if ((await hour.count()) !== 1) throw new Error(`start time ${start} not offered`);
+    if (!/hourBtnAvailable/.test(await hour.getAttribute('class'))) return [];
+    await hour.click();
+    await page.waitForTimeout(1000);
+
+    const body = () => page.innerText('body');
+    const max = Number((await body()).match(/最大(\d+)時間/)?.[1] ?? 1);
+    if (duration > max) return [];
+    for (let i = 1; i < duration; i++) {
+      await page.locator('button', { hasText: /^＋$/ }).click();
+      await page.waitForTimeout(700);
+    }
+    const t = await body();
+    if (!t.includes(`${duration}時間`)) throw new Error('duration selector did not reach requested value');
+    return parseCourtList(t.slice(t.indexOf('③ コート')), duration);
   } finally {
     await browser.close();
   }
