@@ -27,3 +27,7 @@ Sansanピックルボールコート池袋(予約: https://reserve.sansan-pickle
 ## 補足
 - Node 22、ESM、依存なし(playwrightはoptionalDependency)。`node --test "test/*.test.js"`(Node22はディレクトリ指定不可)。
 - 作業は linebot リポジトリと無関係。未コミット・未push。ファイルは前セッションのコンテナ内のみに存在するため、消える前に回収すること。
+
+## 更新 (2026-10-07)
+- 依頼者から「閲覧のみ・低頻度で進めてよい」と了承を得て、sansan-ikebukuro を実装済み(詳細は README)。
+- 未解決: :30 開始枠の取りこぼし(README「既知の制限」)。次にやるなら、カレンダー表示と差が出た日(10/10 など)でコート別表示を1回だけ確認する。

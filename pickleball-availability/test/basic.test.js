@@ -20,3 +20,16 @@ test('one failing adapter does not stop others', async () => {
   assert.match(out[0].note, /boom/);
   assert.equal(out[1].status, 'available');
 });
+
+test('sansan parseHourButtons maps available / full / unknown', async () => {
+  const { parseHourButtons } = await import('../src/adapters/sansan-ikebukuro.js');
+  const ctx = { facility: 'sansan-ikebukuro', date: '2026-10-15', booking_url: 'u', fetched_at: 't' };
+  const out = parseHourButtons([
+    { text: '09:00\n空1', available: true },
+    { text: '10:00\n満', available: false },
+    { text: '11:00\n???', available: false },
+    { text: 'junk', available: false },
+  ], ctx);
+  assert.deepEqual(out.map((s) => [s.start, s.end, s.status]), [['09:00', '10:00', 'available'], ['10:00', '11:00', 'booked'], ['11:00', '12:00', 'unknown']]);
+  assert.equal(out[0].note, '空きコート1面');
+});
